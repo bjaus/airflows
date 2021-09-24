@@ -1,0 +1,31 @@
+name: airflow-integration
+on: [push]
+jobs:
+  integrate-aiflow:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install flake8 pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run Flake8 Linter
+        run: |
+          # Stop build if any of the follow error/warning groups trigger
+          flake8 . --count --select=E4,E7,E9,F4,F6,F7,F8,F9,W1 --show-source --statistics --exclude=__init__.py
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 characters wide
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Run Test-Suite
+        run: |
+          if [ -f .env.sample ]; then cp .env.sample .env; fi
+          pytest
