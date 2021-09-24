@@ -29,3 +29,14 @@ jobs:
         run: |
           if [ -f .env.sample ]; then cp .env.sample .env; fi
           pytest
+
+      - name: Zip Plugins
+        run: |
+          cd plugins
+          zip -r plugins.zip .
+          mv plugins.zip ../.
+          cd ..
+
+      - name: Upload to S3
+        run: |
+          echo $(pwd)
