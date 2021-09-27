@@ -53,12 +53,4 @@ jobs:
 
       - name: Update AWS Airflow S3 Object Versions
         run: |
-          pluginsVersion=$(aws s3api list-object-versions --bucket ${{ secrets.AWS_AIRFLOW_BUCKET }} --prefix plugins.zip --query 'Versions[?IsLatest].[VersionId]' --output text)
-
-          requirementsVersion=$(aws s3api list-object-versions --bucket ${{ secrets.AWS_AIRFLOW_BUCK }} --prefix requirements.txt --query 'Versions[?IsLatest].[VersionId]' --output text)
-
-          aws mwaa update-environment \
-            --name gar-airflow-testing \
-            --region us-east-1 \
-            --plugins-s3-object-version ${pluginsVersion} \
-            --requirements-s3-object-version ${requirementsVersion}
+          echo ${{ secrets.AWS_AIRFLOW_S3_BUCKET }}
