@@ -12,61 +12,90 @@ jobs:
         with:
           python-version: 3.9
 
-      - name: Test Running Python Directly
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip wheel
+          pip install flake8 pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run Flake8 Linter
+        run: |
+          # Stop build if any of the follow error/warning groups trigger
+          flake8 . --count --select=E4,E7,E9,F4,F6,F7,F8,F9,W1 --show-source --statistics --exclude=__init__.py
+          # exit-zero treats all errors as warnings. The GitHub editor is 127 characters wide
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Run Test-Suite
+        run: |
+          if [ -f .env.sample ]; then cp .env.sample .env; fi
+          pytest
+
+      - name: Zip Plugins
+        run: |
+          cd plugins
+          chmod -R 755 .
+          zip -r plugins.zip .
+          mv plugins.zip ../.
+          cd ..
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_AIRFLOW_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_AIRFLOW_ACCESS_SECRET_KEY }}
+          aws-region: ${{ secrets.AWS_AIRFLOW_REGION }}
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp plugins.zip s3://airflow-gar-testing/plugins.zip
+          aws s3 cp requirements.txt s3://airflow-gar-testing/requirements.txt
+          aws s3 sync ./dags/ s3://airflow-gar-testing/dags/ --exclude="*" --include="*.py"
+
+      - name: Update AWS Airflow S3 Object Versions
         env:
+          ACCESS_KEY_ID: ${{ secrets.AWS_AIRFLOW_ACCESS_KEY_ID }}
+          ACCESS_SECRET_KEY: ${{ secrets.AWS_AIRFLOW_ACCESS_SECRET_KEY }}
           S3_BUCKET: ${{ secrets.AWS_AIRFLOW_S3_BUCKET }}
+          AIRFLOW_ENV_NAME: ${{ secrets.AWS_AIRFLOW_MWAA_ENV_NAME }}
         shell: python
         run: |
-          import os
-          print(os.getenv("S3_BUCKET"))
+          from time import sleep
 
-#      - name: Install Dependencies
-#        run: |
-#          python -m pip install --upgrade pip wheel
-#          pip install flake8 pytest
-#          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          import boto3
 
-#      - name: Run Flake8 Linter
-#        run: |
-#          # Stop build if any of the follow error/warning groups trigger
-#          flake8 . --count --select=E4,E7,E9,F4,F6,F7,F8,F9,W1 --show-source --statistics --exclude=__init__.py
-#          # exit-zero treats all errors as warnings. The GitHub editor is 127 characters wide
-#          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          region = os.environ["AWS_AIRFLOW_REGION"]
+          access_key_id = os.environ["ACCESS_KEY_ID"]
+          access_secret_key = os.environ["ACCESS_SECRET_KEY"]
+          bucket_name = os.environ["S3_BUCKET"]
+          mwaa_env_name = os.environ["AIRFLOW_ENV_NAME"]
 
-#      - name: Run Test-Suite
-#        run: |
-#          if [ -f .env.sample ]; then cp .env.sample .env; fi
-#          pytest
+          session = boto3.Session(
+            aws_access_key_id=access_key_id,
+            aws_secret_access_key=access_secret_key,
+            region_name=region,
+          )
 
-#      - name: Zip Plugins
-#        run: |
-#          cd plugins
-#          chmod -R 755 .
-#          zip -r plugins.zip .
-#          mv plugins.zip ../.
-#          cd ..
+          mwaa = session.client("mwaa")
+          s3 = session.resource("s3")
+          bucket = s3.Bucket(bucket_name)
 
-#      - name: Configure AWS Credentials
-#        uses: aws-actions/configure-aws-credentials@v1
-#        with:
-#          aws-access-key-id: ${{ secrets.AWS_AIRFLOW_ACCESS_KEY_ID }}
-#          aws-secret-access-key: ${{ secrets.AWS_AIRFLOW_ACCESS_SECRET_KEY }}
-#          aws-region: ${{ secrets.AWS_AIRFLOW_REGION }}
+          def get_latest_version(prefix):
+            versions = bucket.object_versions.filter(Prefix=prefix)
+            for index, item in enumerate(versions):
+              if not index:
+                obj = item.get()
+                return obj.get("VersionId")
 
-#      - name: Upload to S3
-#        run: |
-#          aws s3 cp plugins.zip s3://airflow-gar-testing/plugins.zip
-#          aws s3 cp requirements.txt s3://airflow-gar-testing/requirements.txt
-#          aws s3 sync ./dags/ s3://airflow-gar-testing/dags/ --exclude="*" --include="*.py"
+          def get_environment_status():
+            resp = mwaa.get_environment(Name=mwaa_env_name)
+            data = resp.get("Environment", {})
+            return data.get("LastUpdate", {}).get("Status", "PENDING")
 
-#      - name: Update AWS Airflow S3 Object Versions
-#        run: |
-#          pluginsVersion=$(aws s3api list-object-versions --bucket ${{ secrets.AWS_AIRFLOW_S3_BUCKET }} --prefix plugins.zip --query 'Versions[?IsLatest].[VersionId]' --output text)
+          while get_environment_status() == "PENDING":
+            sleep(60)
 
-#          requirementsVersion=$(aws s3api list-object-versions --bucket ${{ secrets.AWS_AIRFLOW_S3_BUCKET }} --prefix requirements.txt --query 'Versions[?IsLatest].[VersionId]' --output text)
-
-#          aws mwaa update-environment \
-#            --name gar-airflow-testing \
-#            --region ${{ secrets.AWS_AIRFLOW_REGION }} \
-#            --plugins-s3-object-version ${pluginsVersion} \
-#            --requirements-s3-object-version ${requirementsVersion}
+          mwaa.update_environment(
+            Name=mwaa_env_name,
+            PluginsS3ObjectVersion=get_latest_version(prefix="plugins.zip"),
+            RequirementsS3ObjectVersion=get_latest_version(prefix="requirements.txt"),
+          )
