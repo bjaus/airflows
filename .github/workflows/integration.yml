@@ -33,6 +33,7 @@ jobs:
       - name: Zip Plugins
         run: |
           cd plugins
+          chmod -R 755 .
           zip -r plugins.zip .
           mv plugins.zip ../.
           cd ..
@@ -49,3 +50,15 @@ jobs:
           aws s3 cp plugins.zip s3://airflow-gar-testing/plugins.zip
           aws s3 cp requirements.txt s3://airflow-gar-testing/requirements.txt
           aws s3 sync ./dags/ s3://airflow-gar-testing/dags/ --exclude="*" --include="*.py"
+
+      - name: Update AWS Airflow S3 Object Versions
+        run: |
+          pluginsVersion=$(aws s3api list-object-versions --bucket ${{ secrets.AWS_AIRFLOW_BUCKET }} --prefix plugins.zip --query 'Versions[?IsLatest].[VersionId]' --output text)
+
+          requirementsVersion=$(aws s3api list-object-versions --bucket ${{ secrets.AWS_AIRFLOW_BUCK }} --prefix requirements.txt --query 'Versions[?IsLatest].[VersionId]' --output text)
+
+          aws mwaa update-environment \
+            --name gar-airflow-testing \
+            --region us-east-1 \
+            --plugins-s3-object-version ${pluginsVersion} \
+            --requirements-s3-object-version ${requirementsVersion}
