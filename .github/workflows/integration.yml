@@ -43,7 +43,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_AIRFLOW_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_AIRFLOW_ACCESS_SECRET_KEY }}
-          aws-region: us-east-1
+          aws-region: ${{ secrets.AWS_AIRFLOW_REGION }}
 
       - name: Upload to S3
         run: |
@@ -53,4 +53,12 @@ jobs:
 
       - name: Update AWS Airflow S3 Object Versions
         run: |
-          echo ${{ secrets.AWS_AIRFLOW_S3_BUCKET }}
+          pluginsVersion=$(aws s3api list-object-versions --bucket ${{ secrets.AWS_AIRFLOW_S3_BUCKET }} --prefix plugins.zip --query 'Versions[?IsLatest].[VersionId]' --output text)
+
+          requirementsVersion=$(aws s3api list-object-versions --bucket ${{ secrets.AWS_AIRFLOW_S3_BUCKET }} --prefix requirements.txt --query 'Versions[?IsLatest].[VersionId]' --output text)
+
+          aws mwaa update-environment \
+            --name gar-airflow-testing \
+            --region ${{ secrets.AWS_AIRFLOW_REGION }} \
+            --plugins-s3-object-version ${pluginsVersion} \
+            --requirements-s3-object-version ${requirementsVersion}
