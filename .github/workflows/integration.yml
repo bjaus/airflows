@@ -15,7 +15,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip wheel
-          pip install flake8 pytest
+          pip install flake8 pytest boto3
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Run Flake8 Linter
