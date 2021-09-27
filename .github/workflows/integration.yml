@@ -62,6 +62,12 @@ jobs:
           aws s3 sync ./dags/ s3://airflow-gar-testing/dags/ --exclude="*" --include="*.py"
 
       - name: Update AWS Airflow S3 Object Versions
+        env:
+          AWS_AIRFLOW_ACCESS_KEY_ID: ${{ secrets.AWS_AIRFLOW_ACCESS_KEY_ID }}
+          AWS_AIRFLOW_ACCESS_SECRET_KEY: ${{ secrets.AWS_AIRFLOW_ACCESS_SECRET_KEY }}
+          AWS_AIRFLOW_S3_BUCKET: ${{ secrets.AWS_AIRFLOW_S3_BUCKET }}
+          AWS_AIRFLOW_MWAA_ENV_NAME: ${{ secrets.AWS_AIRFLOW_MWAA_ENV_NAME }}
+          AWS_AIRFLOW_REGION: ${{ secrets.AWS_AIRFLOW_REGION }}
         shell: python
         run: |
           import os
