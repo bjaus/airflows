@@ -34,11 +34,11 @@ jobs:
           #pytest
 
       - name: Run Black Reformatter
-        run |
+        run: |
           # Stop build if black would need to reformat a file
           black . \
-            --line-length 120 \
-            --target-version py39
+            --target-version py39 \
+            --line-length 120
 
       - name: Zip Plugins
         run: |
