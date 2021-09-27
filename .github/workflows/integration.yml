@@ -15,6 +15,7 @@ jobs:
       - name: Test Running Python Directly
         env:
           S3_BUCKET: ${{ secrets.AWS_AIRFLOW_S3_BUCKET }}
+        shell: python
         run: |
           import os
           print(os.getenv("S3_BUCKET"))
