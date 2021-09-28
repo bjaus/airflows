@@ -28,86 +28,101 @@ jobs:
             --max-line-length=127 \
             --exclude=__init__.py
 
+      - name: Ensure Failure
+        shell: python
+        run: |
+          import sys
+          sys.exit(1)
+
+      #- name: Run Black Reformatter
+        #run: |
+          ## Stop build if black would need to reformat a file
+          #black . \
+            #--target-version py39 \
+            #--line-length 120
+
       #- name: Run Test-Suite
         #run: |
           #if [ -f .env.sample ]; then cp .env.sample .env; fi
           #pytest
 
-      - name: Run Black Reformatter
-        run: |
-          # Stop build if black would need to reformat a file
-          black . \
-            --target-version py39 \
-            --line-length 120
+      #- name: Zip Plugins
+        #run: |
+          #cd plugins
+          #chmod -R 755 .
+          #zip -r plugins.zip .
+          #mv plugins.zip ../.
+          #cd ..
 
-      - name: Zip Plugins
-        run: |
-          cd plugins
-          chmod -R 755 .
-          zip -r plugins.zip .
-          mv plugins.zip ../.
-          cd ..
+      #- name: Configure AWS Credentials
+        #uses: aws-actions/configure-aws-credentials@v1
+        #with:
+          #aws-access-key-id: ${{ secrets.AWS_AIRFLOW_ACCESS_KEY_ID }}
+          #aws-secret-access-key: ${{ secrets.AWS_AIRFLOW_ACCESS_SECRET_KEY }}
+          #aws-region: ${{ secrets.AWS_AIRFLOW_REGION }}
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_AIRFLOW_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_AIRFLOW_ACCESS_SECRET_KEY }}
-          aws-region: ${{ secrets.AWS_AIRFLOW_REGION }}
+      #- name: Upload to S3
+        #run: |
+          #aws s3 cp plugins.zip s3://airflow-gar-testing/plugins.zip
+          #aws s3 cp requirements.txt s3://airflow-gar-testing/requirements.txt
+          #aws s3 sync ./dags/ s3://airflow-gar-testing/dags/ --exclude="*" --include="*.py"
 
-      - name: Upload to S3
-        run: |
-          aws s3 cp plugins.zip s3://airflow-gar-testing/plugins.zip
-          aws s3 cp requirements.txt s3://airflow-gar-testing/requirements.txt
-          aws s3 sync ./dags/ s3://airflow-gar-testing/dags/ --exclude="*" --include="*.py"
+      #- name: Update AWS Airflow S3 Object Versions
+        #env:
+          #AWS_AIRFLOW_ACCESS_KEY_ID: ${{ secrets.AWS_AIRFLOW_ACCESS_KEY_ID }}
+          #AWS_AIRFLOW_ACCESS_SECRET_KEY: ${{ secrets.AWS_AIRFLOW_ACCESS_SECRET_KEY }}
+          #AWS_AIRFLOW_S3_BUCKET: ${{ secrets.AWS_AIRFLOW_S3_BUCKET }}
+          #AWS_AIRFLOW_MWAA_ENV_NAME: ${{ secrets.AWS_AIRFLOW_MWAA_ENV_NAME }}
+          #AWS_AIRFLOW_REGION: ${{ secrets.AWS_AIRFLOW_REGION }}
+        #shell: python
+        #run: |
+          #import os, sys, time
+          #import boto3
 
-      - name: Update AWS Airflow S3 Object Versions
-        env:
-          AWS_AIRFLOW_ACCESS_KEY_ID: ${{ secrets.AWS_AIRFLOW_ACCESS_KEY_ID }}
-          AWS_AIRFLOW_ACCESS_SECRET_KEY: ${{ secrets.AWS_AIRFLOW_ACCESS_SECRET_KEY }}
-          AWS_AIRFLOW_S3_BUCKET: ${{ secrets.AWS_AIRFLOW_S3_BUCKET }}
-          AWS_AIRFLOW_MWAA_ENV_NAME: ${{ secrets.AWS_AIRFLOW_MWAA_ENV_NAME }}
-          AWS_AIRFLOW_REGION: ${{ secrets.AWS_AIRFLOW_REGION }}
-        shell: python
-        run: |
-          import os
-          from time import sleep
+          #access_key_id = os.environ["AWS_AIRFLOW_ACCESS_KEY_ID"]
+          #access_secret_key = os.environ["AWS_AIRFLOW_ACCESS_SECRET_KEY"]
+          #bucket_name = os.environ["AWS_AIRFLOW_S3_BUCKET"]
+          #mwaa_env_name = os.environ["AWS_AIRFLOW_MWAA_ENV_NAME"]
+          #region = os.environ["AWS_AIRFLOW_REGION"]
 
-          import boto3
+          #session = boto3.Session(
+            #aws_access_key_id=access_key_id,
+            #aws_secret_access_key=access_secret_key,
+            #region_name=region,
+          #)
 
-          access_key_id = os.environ["AWS_AIRFLOW_ACCESS_KEY_ID"]
-          access_secret_key = os.environ["AWS_AIRFLOW_ACCESS_SECRET_KEY"]
-          bucket_name = os.environ["AWS_AIRFLOW_S3_BUCKET"]
-          mwaa_env_name = os.environ["AWS_AIRFLOW_MWAA_ENV_NAME"]
-          region = os.environ["AWS_AIRFLOW_REGION"]
+          #mwaa = session.client("mwaa")
+          #s3 = session.resource("s3")
+          #bucket = s3.Bucket(bucket_name)
 
-          session = boto3.Session(
-            aws_access_key_id=access_key_id,
-            aws_secret_access_key=access_secret_key,
-            region_name=region,
-          )
+          #def get_latest_version(prefix):
+            #versions = bucket.object_versions.filter(Prefix=prefix)
+            #for index, item in enumerate(versions):
+              #if not index:
+                #obj = item.get()
+                #return obj.get("VersionId")
 
-          mwaa = session.client("mwaa")
-          s3 = session.resource("s3")
-          bucket = s3.Bucket(bucket_name)
+          #def get_environment_status():
+            #resp = mwaa.get_environment(Name=mwaa_env_name)
+            #data = resp.get("Environment", {})
+            #return data.get("LastUpdate", {}).get("Status", "PENDING")
 
-          def get_latest_version(prefix):
-            versions = bucket.object_versions.filter(Prefix=prefix)
-            for index, item in enumerate(versions):
-              if not index:
-                obj = item.get()
-                return obj.get("VersionId")
+          #attempt = 0
+          #max_attempts = 30
 
-          def get_environment_status():
-            resp = mwaa.get_environment(Name=mwaa_env_name)
-            data = resp.get("Environment", {})
-            return data.get("LastUpdate", {}).get("Status", "PENDING")
+          #while (status := get_environment_status()) != "SUCCESS":
+            #time.sleep(60)
 
-          while get_environment_status() == "PENDING":
-            sleep(60)
+            #attempt += 1
+            #if attempt > max_attempts:
+              #break
 
-          mwaa.update_environment(
-            Name=mwaa_env_name,
-            PluginsS3ObjectVersion=get_latest_version(prefix="plugins.zip"),
-            RequirementsS3ObjectVersion=get_latest_version(prefix="requirements.txt"),
-          )
+          #if status == "SUCCESS":
+            #mwaa.update_environment(
+              #Name=mwaa_env_name,
+              #PluginsS3ObjectVersion=get_latest_version(prefix="plugins.zip"),
+              #RequirementsS3ObjectVersion=get_latest_version(prefix="requirements.txt"),
+            #)
+          #else:
+            #print(f"Final status: {status!r}")
+            #sys.exit(1)

@@ -6,6 +6,7 @@ from operators.hello import HelloOperator
 from operators.operator import MyOperator
 from sensors.sensor import MySensor
 
+# Can you see me?
 
 DEFAULT_ARGS = {
     "owner": "bos",
